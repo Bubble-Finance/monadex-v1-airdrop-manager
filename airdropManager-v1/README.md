@@ -1,8 +1,7 @@
 # MONADEX AIRDROP
 
 <p align="center">
-<img src="![image](https://github.com/Monadex-Labs/monadex-airdrop-manager-v1/assets/95578112/7f536328-c0cf-4832-8ac8-e58aeafe680d)
-" width="200" alt="Monadex Airdrop">
+<img src="https://github.com/Monadex-Labs/monadex-airdrop-manager-v1/assets/95578112/7f536328-c0cf-4832-8ac8-e58aeafe680d" width="200" alt="Monadex Airdrop">
 <br/>
 </p>
 
