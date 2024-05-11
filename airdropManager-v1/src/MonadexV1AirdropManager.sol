@@ -87,10 +87,24 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     ///////////
     ///Event///
     //////////
-    event E_TokenToClaim(address token, address claimer);
-    event E_directTokenToclaim(address token, uint256 amount);
-    event E_addAirdropfund(address token, uint256 amountToAdd);
-    event E_addToken(address token);
+    event E_TokenToClaim(
+        address token,
+        address claimer
+        );
+
+    event E_directTokenToclaim(
+        address token,
+         uint256 amount
+         );
+
+    event E_addAirdropfund(
+        address token,
+        uint256 amountToAdd
+        );
+        
+    event E_addToken(
+        address token
+        );
 
     constructor(
         uint256 _claimAmountPerWallet,
