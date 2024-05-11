@@ -1,7 +1,8 @@
 # MONADEX AIRDROP
 
 <p align="center">
-<img src="https://cdn.discordapp.com/attachments/1190058523074244711/1238820723452018779/Airdrop.png?ex=6640ad34&is=663f5bb4&hm=c9b3275d2344a6ea9741488239c20eb7ed86c597693f727bae5d4d5e4f24c5ec&" width="200" alt="Monadex Airdrop">
+<img src="![image](https://github.com/Monadex-Labs/monadex-airdrop-manager-v1/assets/95578112/7f536328-c0cf-4832-8ac8-e58aeafe680d)
+" width="200" alt="Monadex Airdrop">
 <br/>
 </p>
 
