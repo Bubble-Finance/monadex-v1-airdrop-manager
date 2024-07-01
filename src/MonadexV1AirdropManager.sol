@@ -1,25 +1,26 @@
+// Layout:
+//     - pragma
+//     - imports
+//     - interfaces, libraries, contracts
+//     - type declarations
+//     - state variables
+//     - events
+//     - errors
+//     - modifiers
+//     - functions
+//         - constructor
+//         - receive function (if exists)
+//         - fallback function (if exists)
+//         - external
+//         - public
+//         - internal
+//         - private
+//         - view and pure functions
+
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
-// LAYOUT OVERVIEW
-// version
-// imports
-// errors
-// interfaces, libraries, contracts
-// Type declarations
-// State variables
-// Events
-// Modifiers
-// Functions
 
-// Layout of Functions:
-// constructor
-// receive function (if exists)
-// fallback function (if exists)
-// external
-// public
-// internal
-// private
-// view & pure functions
+
 
 /// @title MonadexV1AirdropManager
 /// @author Ola Hamid
@@ -256,7 +257,7 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
         if (user == address(0)) {
             revert Monadex_ZeroAddressError();
         }
-        bytes32 leaf = keccak256(abi.encode(user, index, amount));
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(user, index, amount))));
 
         if (!MerkleProof.verify(proof, merkleRoot, leaf)) {
             revert Monadex_InvalidMekleproofError();
