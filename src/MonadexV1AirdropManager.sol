@@ -18,7 +18,7 @@
 //         - view and pure functions
 
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity 0.8.24;
 
 
 
@@ -80,7 +80,6 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     error Monadex_ZeroAddressError();
     error Monadex_maxAddressLimit(uint256 maxAddressLimit, uint256 receiverLength);
     error Monadex_InvalidMekleproofError();
-    error Monadex_newAddressAlreadyExisted();
     error Monadex_HasClaimedError();
     error Monadex_sameTokenAddrAlreadyAdded();
     error Monadex_moreThanZeroAmount();
@@ -89,22 +88,22 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     ///Event///
     //////////
     event E_TokenToClaim(
-        address token,
-        address claimer
+        address indexed token,
+        address indexed claimer
         );
 
     event E_directTokenToclaim(
-        address token,
-         uint256 amount
+        address indexed token,
+         uint256 indexed amount
          );
 
     event E_addAirdropfund(
-        address token,
-        uint256 amountToAdd
+        address indexed token,
+        uint256 indexed amountToAdd
         );
         
     event E_addToken(
-        address token
+        address indexed token
         );
 
     constructor(
@@ -152,8 +151,8 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
         uint256 totalAmountToAirdrop
     )
         external
-        onlyOwner
         nonReentrant
+        onlyOwner
     {
         if (m_supportedToken[supportedToken] != true) {
             revert Monadex_UnsupportedAirdropToken(supportedToken);
@@ -187,8 +186,9 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
         uint256 index
     )
         external
-        onlyOwner
         nonReentrant
+        onlyOwner
+        
     {
         if (m_supportedToken[supportedToken] != true) {
             revert Monadex_UnsupportedAirdropToken(supportedToken);
@@ -197,8 +197,8 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
             revert Monadex_maxAddressLimit(maxAddressLimit, receiver.length);
         }
         IERC20 token = IERC20(supportedToken);
-
-        for (uint256 i = 0; i < receiver.length; ++i) {
+        uint256 receiverLength = receiver.length;
+        for (uint256 i = 0; i < receiverLength; ++i) {
             verifyProof(receiver[i], proof, index, claimAmount);
             BitMaps.setTo(_airdropLists, index, true);
             token.safeTransfer(receiver[i], amount);
@@ -273,11 +273,39 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     function getNewToken(
         uint256 TokenID
         ) 
-        public 
+        external 
         view 
         returns (address) {
         return s_Tokens[TokenID];
     }
+
+    /**
+     * @notice Returns the bool for address have claimed or not.
+     * @param _claimer address of user that have claimed
+     */
+
+   function getClaimedAddress(
+    address _claimer
+   )
+   external 
+   view 
+   returns (bool) {
+    return m_hasClaimed[_claimer];
+   }
+
+   /**
+    * @notice Function checks if token address is supported or not
+    * @param _isSupportedToken token address 
+    */
+   function getSupportedToken (
+    address _isSupportedToken
+   )
+   external 
+   view 
+   returns (bool) {
+    return m_supportedToken[_isSupportedToken];
+   }
+
 }
 
 
