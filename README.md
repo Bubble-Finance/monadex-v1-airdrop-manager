@@ -1,65 +1,66 @@
-# MONADEX AIRDROP
+## Foundry
 
-<p align="center">
-<img src="https://github.com/Monadex-Labs/monadex-airdrop-manager-v1/assets/95578112/7f536328-c0cf-4832-8ac8-e58aeafe680d" alt="Monadex Airdrop">
-<br/>
-</p>
+**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
 
-- [MONADEX AIRDROP](#monadex-airdrop)
-- [Project Introduction](#project-introduction)
-- [Getting Started](#getting-started)
-  - [Requirements](#requirements)
-  - [Installation](#installation)
-  - [Quickstart](#quickstart)
-- [Usage](#usage)
-  - [Coverage](#coverage)
-- [Audit Scope Details](#audit-scope-details)
-  - [Roles](#roles)
-  - [Known Issues](#known-issues)
-<!-- Additional requirements here -->
+Foundry consists of:
 
-# Project Introduction
-Welcome to Monadex Airdrop, the dedicated contract for managing airdrops within the Monadex ecosystem. This repository contains the smart contract for the airdrop process, utilizing a Merkle tree for efficient eligibility verification. Participants submit their proof of eligibility, which is verified against the Merkle root. Upon successful verification, participants can claim their airdrop tokens.
+-   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
+-   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
+-   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
+-   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
 
-For those seeking non-technical, in-depth documentation, we have prepared a comprehensive guide available on [GitBook](https://monadex.gitbook.io/monadex). This resource is tailored to provide a thorough understanding of Monadex Airdrop, its features, and how to get started, making it an invaluable asset for both newcomers and experienced users alike.
+## Documentation
 
-Join us in shaping the future of decentralized finance by contributing to Monadex Airdrop. Whether you're a developer looking to build on our platform, a trader seeking a new exchange, or simply curious about the project, we welcome you to explore and engage with our community.
+https://book.getfoundry.sh/
 
-# Getting Started
+## Usage
 
-## Requirements
+### Build
 
-- [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-  - You'll know you did it right if you can run `git --version` and you see a response like `git version x.x.x`
-- [foundry](https://getfoundry.sh/)
-  - You'll know you did it right if you can run `forge --version` and you see a response like `forge 0.2.0 (816e00b 2023-03-16T00:05:26.396218Z)`
-<!-- Additional requirements here -->
-
-## Installation
-
-```bash
-git clone https://github.com/Monadex-Labs/monadex-airdrop-manager-v1 cd monadex-airdrop-manager-v1
-cd monadex-protocol-v1
-make init
+```shell
+$ forge build
 ```
 
-## Quickstart 
+### Test
 
-```bash
-make test
+```shell
+$ forge test
 ```
 
-# Usage 
+### Format
 
-## Coverage
+```shell
+$ forge fmt
+```
 
+### Gas Snapshots
 
-# Audit Scope Details
+```shell
+$ forge snapshot
+```
 
-## Roles
+### Anvil
 
-- Role1: <!-- Description -->
+```shell
+$ anvil
+```
 
-## Known Issues
+### Deploy
 
-- Issue1: <!-- Description -->
+```shell
+$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
+```
+
+### Cast
+
+```shell
+$ cast <subcommand>
+```
+
+### Help
+
+```shell
+$ forge --help
+$ anvil --help
+$ cast --help
+```
