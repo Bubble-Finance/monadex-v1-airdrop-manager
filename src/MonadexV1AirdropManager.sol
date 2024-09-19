@@ -61,7 +61,7 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     uint256 public maxAddressLimit;
 
     /// @notice The amount of tokens each eligible address can claim.
-    uint256 public claimAmount;
+    uint256 public claimedAmount;
 
     /// @notice A public mapping to track if a token is supported for the airdrop.
     mapping(address => bool isSupported) public m_supportedToken;
@@ -89,6 +89,7 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     //////////
     event E_TokenToClaim(
         address indexed token,
+        uint256 indexed amount,
         address indexed claimer
         );
 
@@ -107,13 +108,11 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
         );
 
     constructor(
-        uint256 _claimAmountPerWallet,
         uint256 _maxAddressLimit,
         bytes32 _merkleRoot
     )
         Ownable(msg.sender)
     {
-        claimAmount = _claimAmountPerWallet;
         maxAddressLimit = _maxAddressLimit;
         merkleRoot = _merkleRoot;
     }
@@ -173,7 +172,7 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     /// Requires a valid Merkle proof for each recipient.
     /// @param supportedToken Token address to distribute.
     /// @param receiver Array of recipient addresses.
-    /// @param amount Amount of tokens to distribute.
+    /// @param _amount Amount of tokens to distribute.
     /// @param proof Merkle proof for each recipient's eligibility.
     /// @param index Leaf index in the Merkle tree for the proof.
     /// @dev Transfers tokens to recipients based on Merkle proofs.
@@ -181,7 +180,7 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     function directAirdrop(
         address supportedToken,
         address[] memory receiver,
-        uint256 amount,
+        uint256[] memory _amount,
         bytes32[] calldata proof,
         uint256 index
     )
@@ -199,12 +198,13 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
         IERC20 token = IERC20(supportedToken);
         uint256 receiverLength = receiver.length;
         for (uint256 i = 0; i < receiverLength; ++i) {
-            verifyProof(receiver[i], proof, index, claimAmount);
+            verifyProof(receiver[i], proof, index, _amount[i] );
             BitMaps.setTo(_airdropLists, index, true);
-            token.safeTransfer(receiver[i], amount);
+            token.safeTransfer(receiver[i], _amount[i]);
+            claimedAmount += _amount[i];
         }
 
-        emit E_directTokenToclaim(supportedToken, amount);
+        emit E_directTokenToclaim(supportedToken, claimedAmount);
     }
 
     /// @notice Claims airdrop by providing a valid Merkle proof.
@@ -216,6 +216,7 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     /// Checks token support, proof validity, and claim status.
     /// Transfers the token and updates the airdrop list.
     function claimAirdrop(
+        uint _amount,
         address supportedToken,
         bytes32[] calldata proof,
         uint256 index
@@ -230,12 +231,13 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
         if (BitMaps.get(_airdropLists, index)) {
             revert Monadex_HasClaimedError();
         }
-        verifyProof(msg.sender, proof, index, claimAmount);
+        verifyProof(msg.sender, proof, index, _amount);
         BitMaps.setTo(_airdropLists, index, true);
         IERC20 token = IERC20(supportedToken);
+        claimedAmount += _amount;
 
-        emit E_TokenToClaim(supportedToken, msg.sender);
-        token.safeTransfer(msg.sender, claimAmount);
+        emit E_TokenToClaim(supportedToken,_amount, msg.sender);
+        token.safeTransfer(msg.sender, _amount);
     }
     /// @notice Verifies a Merkle proof for a user's claim.
     /// Checks if the user's address is valid and the proof is correct.
@@ -305,7 +307,11 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
    returns (bool) {
     return m_supportedToken[_isSupportedToken];
    }
-
+   function getClaimedAmount(
+   ) external
+   view returns(uint){
+    return claimedAmount;
+   }
 }
 
 
