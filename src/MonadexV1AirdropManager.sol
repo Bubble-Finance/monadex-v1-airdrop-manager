@@ -36,9 +36,11 @@ import { IERC20 } from "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC
 import { SafeERC20 } from "../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Address } from "../lib/openzeppelin-contracts/contracts/utils/Address.sol";
 import { ReentrancyGuard } from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {EIP712} from "../lib/openzeppelin-contracts/contracts/utils/cryptography/EIP712.sol";
+import {ECDSA} from "../lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 
 
-contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
+contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
     using Address for address;
     using SafeERC20 for IERC20;
 
@@ -60,7 +62,7 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     /// @notice The maximum number of addresses that can claim the airdrop.
     uint256 public maxAddressLimit;
 
-    /// @notice The amount of tokens each eligible address can claim.
+    /// @notice The amount of tokens each eligible address has claim.
     uint256 public claimedAmount;
 
     /// @notice A public mapping to track if a token is supported for the airdrop.
@@ -72,6 +74,12 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     /// @notice A public mapping to track if an address has already claimed the airdrop.
     mapping(address => bool) public m_hasClaimed;
 
+    struct monadexAirdropClaimer {
+        address claimer;
+        uint256 amount;
+    }
+
+    bytes32 private constant messageTypeHash = keccak256("monadexAirdropClaimer(address claimer, uint amount");
 
     ///////////
     ///ERROR///
@@ -82,7 +90,8 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
     error Monadex_InvalidMekleproofError();
     error Monadex_HasClaimedError();
     error Monadex_sameTokenAddrAlreadyAdded();
-    error Monadex_moreThanZeroAmount();
+    error Monadex_ZeroAmountError();
+    error Monadex_invalidSignatureError();
 
     ///////////
     ///Event///
@@ -112,6 +121,7 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
         bytes32 _merkleRoot
     )
         Ownable(msg.sender)
+        EIP712("MonadexV1AirdropManager", "1")
     {
         maxAddressLimit = _maxAddressLimit;
         merkleRoot = _merkleRoot;
@@ -159,7 +169,7 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
 
         IERC20 token = IERC20(supportedToken);
         if (totalAmountToAirdrop <= 0) {
-            revert Monadex_moreThanZeroAmount();
+            revert Monadex_ZeroAmountError();
         }
         token.safeTransferFrom(msg.sender, address(this), totalAmountToAirdrop);
 
@@ -209,46 +219,67 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
 
     /// @notice Claims airdrop by providing a valid Merkle proof.
     /// Verifies eligibility and updates the airdrop list.
+    /// @param _claimer address to claim
+    /// @param _amount amount for the user to claim 
     /// @param supportedToken Token address to claim.
     /// @param proof Merkle proof for eligibility verification.
     /// @param index Leaf index in the Merkle tree for the proof.
+    /// @param v v
+    /// @param r r
+    /// @param s s
     /// @dev Enables participants to claim their airdrop.
     /// Checks token support, proof validity, and claim status.
     /// Transfers the token and updates the airdrop list.
     function claimAirdrop(
+        address _claimer,
         uint _amount,
         address supportedToken,
         bytes32[] calldata proof,
-        uint256 index
+        uint256 index,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
     )
         external
         nonReentrant
     {
-        m_claimProof[msg.sender] = keccak256(abi.encodePacked(proof));
+        
+        if (_claimer == address(0)) {
+            revert Monadex_ZeroAddressError();
+        }
+
+        if (_amount == 0) {
+            revert Monadex_ZeroAmountError();
+        }
+        
         if (m_supportedToken[supportedToken] != true) {
             revert Monadex_UnsupportedAirdropToken(supportedToken);
         }
         if (BitMaps.get(_airdropLists, index)) {
             revert Monadex_HasClaimedError();
         }
-        verifyProof(msg.sender, proof, index, _amount);
-        BitMaps.setTo(_airdropLists, index, true);
-        IERC20 token = IERC20(supportedToken);
+        if (isValidSignature(_claimer, getDigest(_claimer, _amount), v, r, s)) {
+            revert Monadex_invalidSignatureError();
+        }
+        verifyProof(_claimer, proof, index, _amount);
+        m_claimProof[msg.sender] = keccak256(abi.encodePacked(proof));
         claimedAmount += _amount;
-
-        emit E_TokenToClaim(supportedToken,_amount, msg.sender);
-        token.safeTransfer(msg.sender, _amount);
+        IERC20 token = IERC20(supportedToken);
+        
+        BitMaps.setTo(_airdropLists, index, true);
+        // @audit to be fixed- what is stopping the user to claim more than the amont he is meant to claim?
+        emit E_TokenToClaim(supportedToken,_amount, _claimer);
+        token.safeTransfer(_claimer, _amount);
     }
     /// @notice Verifies a Merkle proof for a user's claim.
     /// Checks if the user's address is valid and the proof is correct.
-    /// @param user The address of the user claiming the airdrop.
+    /// @param _claimer The address of the user claiming the airdrop.
     /// @param proof Merkle proof for the user's claim.
     /// @param index The index of the leaf in the Merkle tree for the proof.
     /// @param amount The amount of the airdrop being claimed.
     /// @dev Private function to validate a user's Merkle proof.
-    /// Reverts if the user's address is zero or the proof is invalid.
     function verifyProof(
-        address user,
+        address _claimer,
         bytes32[] calldata proof,
         uint256 index,
         uint256 amount
@@ -256,14 +287,22 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
         private
         view
     {
-        if (user == address(0)) {
-            revert Monadex_ZeroAddressError();
-        }
-        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(user, index, amount))));
+        bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(_claimer, index, amount))));
 
         if (!MerkleProof.verify(proof, merkleRoot, leaf)) {
             revert Monadex_InvalidMekleproofError();
         }
+    }
+
+    function isValidSignature(
+        address claimer, 
+        bytes32 digest,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) internal pure returns(bool) {
+        (address actualSigner, ,) = ECDSA.tryRecover(digest, v, r, s);
+        return (actualSigner == claimer);
     }
     /////////////////////
     ///getter function///
@@ -286,7 +325,7 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
      * @param _claimer address of user that have claimed
      */
 
-   function getClaimedAddress(
+   function getIfClaimedAddress(
     address _claimer
    )
    external 
@@ -311,6 +350,14 @@ contract MonadexV1AirdropManager is Ownable, ReentrancyGuard {
    ) external
    view returns(uint){
     return claimedAmount;
+   }
+   function getDigest(address claimer, uint amount ) public view returns (bytes32) {
+    return _hashTypedDataV4(keccak256(abi.encode(messageTypeHash,
+         monadexAirdropClaimer({
+            claimer : claimer,
+            amount : amount
+         })
+    )));
    }
 }
 
