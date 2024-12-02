@@ -47,38 +47,40 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
     /////////////////////
     ///state variables///
     /////////////////////
-    /// @notice The root of the Merkle tree used for airdrop eligibility verification.
+    /// @dev The root of the Merkle tree used for airdrop eligibility verification.
     bytes32 public merkleRoot;
 
-    /// @notice A private BitMap to track airdrop claims.
+    /// @dev A private BitMap to track airdrop claims.
     BitMaps.BitMap private _airdropLists;
-
-    /// @notice A public list of eligible addresses for the airdrop.
+    /// @dev ADDR of monadex multi sig
+    address private protocolMultiSig;
+    /// @dev A public list of eligible addresses for the airdrop.
     address[] public eligibleAddresses;
 
-    /// @notice A private array of new tokens added to the system.
+    /// @dev A private array of new tokens added to the system.
     address[] private s_Tokens;
 
-    /// @notice The maximum number of addresses that can claim the airdrop.
+    /// @dev The maximum number of addresses that can claim the airdrop.
     uint256 public maxAddressLimit;
 
-    /// @notice The amount of tokens each eligible address has claim.
+    /// @dev The amount of tokens each eligible address has claim.
     uint256 public claimedAmount;
 
-    /// @notice A public mapping to track if a token is supported for the airdrop.
+    /// @dev A public mapping to track if a token is supported for the airdrop.
     mapping(address => bool isSupported) public m_supportedToken;
 
-    /// @notice A public mapping to store the Merkle proof for each claimant.
+    /// @dev A public mapping to store the Merkle proof for each claimant.
     mapping(address => bytes32) public m_claimProof;
 
-    /// @notice A public mapping to track if an address has already claimed the airdrop.
+    /// @dev A public mapping to track if an address has already claimed the airdrop.
     mapping(address => bool) public m_hasClaimed;
 
+    /// @notice a struct describing the information of an airdrop claimer and its amount to be claimed
     struct monadexAirdropClaimer {
         address claimer;
         uint256 amount;
     }
-
+    /// @dev EIP-712 standard messageTypeHash definitions
     bytes32 private constant messageTypeHash = keccak256("monadexAirdropClaimer(address claimer, uint amount");
 
     ///////////
@@ -96,33 +98,35 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
     ///////////
     ///Event///
     //////////
-    event E_TokenToClaim(
+    event E_TokenClaimed(
         address indexed token,
         uint256 indexed amount,
         address indexed claimer
         );
 
-    event E_directTokenToclaim(
+    event E_directTokenClaimed(
         address indexed token,
          uint256 indexed amount
          );
 
-    event E_addAirdropfund(
+    event E_airdropFundAdded(
         address indexed token,
         uint256 indexed amountToAdd
         );
         
-    event E_addToken(
+    event E_tokenAdded(
         address indexed token
         );
 
     constructor(
+        address _MonadexMultiSigAddress,
         uint256 _maxAddressLimit,
         bytes32 _merkleRoot
     )
-        Ownable(msg.sender)
+        Ownable(_MonadexMultiSigAddress)
         EIP712("MonadexV1AirdropManager", "1")
     {
+        protocolMultiSig =_MonadexMultiSigAddress;
         maxAddressLimit = _maxAddressLimit;
         merkleRoot = _merkleRoot;
     }
@@ -133,7 +137,12 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
     /// @param newToken Token address to be added to the list.
     /// @dev Enables the contract owner to add a new token.
     /// Validates the token address and uniqueness.
-    function addToken(address newToken) external onlyOwner {
+    function addedToken(
+        address newToken
+    ) 
+        external 
+        onlyOwner 
+    {
         if (newToken == address(0)) {
             revert Monadex_ZeroAddressError();
         }
@@ -145,7 +154,7 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
 
         s_Tokens.push(newToken);
 
-        emit E_addToken(newToken);
+        emit E_tokenAdded(newToken);
     }
 
     /// @notice Adds a supported token to the airdrop fund.
@@ -173,7 +182,7 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
         }
         token.safeTransferFrom(msg.sender, address(this), totalAmountToAirdrop);
 
-        emit E_addAirdropfund(supportedToken, totalAmountToAirdrop);
+        emit E_airdropFundAdded(supportedToken, totalAmountToAirdrop);
     }
 
     
@@ -214,7 +223,7 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
             claimedAmount += _amount[i];
         }
 
-        emit E_directTokenToclaim(supportedToken, claimedAmount);
+        emit E_directTokenClaimed(supportedToken, claimedAmount);
     }
 
     /// @notice Claims airdrop by providing a valid Merkle proof.
@@ -258,7 +267,7 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
         if (BitMaps.get(_airdropLists, index)) {
             revert Monadex_HasClaimedError();
         }
-        if (isValidSignature(_claimer, getDigest(_claimer, _amount), v, r, s)) {
+        if (isValidSignature(_claimer, getDigest(_claimer, _amount), v, r, s) != true ) {
             revert Monadex_invalidSignatureError();
         }
         verifyProof(_claimer, proof, index, _amount);
@@ -268,7 +277,7 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
         
         BitMaps.setTo(_airdropLists, index, true);
         // @audit to be fixed- what is stopping the user to claim more than the amont he is meant to claim?
-        emit E_TokenToClaim(supportedToken,_amount, _claimer);
+        emit E_TokenClaimed(supportedToken,_amount, _claimer);
         token.safeTransfer(_claimer, _amount);
     }
     /// @notice Verifies a Merkle proof for a user's claim.
@@ -300,7 +309,11 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) internal pure returns(bool) {
+    ) 
+        internal 
+        pure 
+        returns(bool) 
+    {
         (address actualSigner, ,) = ECDSA.tryRecover(digest, v, r, s);
         return (actualSigner == claimer);
     }
@@ -313,7 +326,7 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
     /// @return returns the address of the token from the mapping.
     function getNewToken(
         uint256 TokenID
-        ) 
+    ) 
         external 
         view 
         returns (address) {
@@ -328,9 +341,9 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
    function getIfClaimedAddress(
     address _claimer
    )
-   external 
-   view 
-   returns (bool) {
+    external 
+    view 
+    returns (bool) {
     return m_hasClaimed[_claimer];
    }
 
@@ -339,26 +352,56 @@ contract MonadexV1AirdropManager is EIP712, Ownable, ReentrancyGuard {
     * @param _isSupportedToken token address 
     */
    function getSupportedToken (
-    address _isSupportedToken
+        address _isSupportedToken
    )
-   external 
-   view 
-   returns (bool) {
-    return m_supportedToken[_isSupportedToken];
+        external 
+        view 
+        returns (bool) 
+    {
+        return m_supportedToken[_isSupportedToken];
    }
    function getClaimedAmount(
-   ) external
-   view returns(uint){
-    return claimedAmount;
+   ) 
+        external
+        view 
+        returns(uint)
+    {
+        return claimedAmount;
    }
-   function getDigest(address claimer, uint amount ) public view returns (bytes32) {
+   function getDigest(
+        address _claimer, 
+        uint _amount 
+    ) 
+        public 
+        view 
+        returns (bytes32) 
+    {
     return _hashTypedDataV4(keccak256(abi.encode(messageTypeHash,
          monadexAirdropClaimer({
-            claimer : claimer,
-            amount : amount
+            claimer : _claimer,
+            amount : _amount
          })
     )));
    }
+
+   function updateProtocolMultiSigAddress(
+        address _protocolMultiSig
+    ) 
+        external 
+        onlyOwner 
+    {
+    if (_protocolMultiSig == address(0)) {
+        revert Monadex_ZeroAddressError();
+    }
+    protocolMultiSig = _protocolMultiSig;
+   }
+    function getProtocolMultiSigAddress() 
+        external 
+        view 
+        returns (address) 
+    {
+        return protocolMultiSig;
+    }
 }
 
 
